@@ -1176,7 +1176,7 @@
         const spd = 800*playerUp.projSpeed;
         const dmg = 10*playerUp.dmg;
         const range = 1*playerUp.range;
-        spawnBullet({x:p.x,y:p.y,vx:Math.cos(a)*spd*1.1,vy:Math.sin(a)*spd*1.1,r:5,dmg:dmg*0.25,ttl:0.5*range,color:'#ffd24a',hostile:false}); // Damage nerfed from 0.4 to 0.25
+        spawnBullet({x:p.x,y:p.y,vx:Math.cos(a)*spd*1.1,vy:Math.sin(a)*spd*1.1,r:5,dmg:dmg*0.2,ttl:0.5*range,color:'#ffd24a',hostile:false}); // Damage nerfed from 0.25 to 0.15
       }
       else if(bw==='BOOMERANG'){
         p.fireCd = 1.2 / playerUp.rof;
