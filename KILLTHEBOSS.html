@@ -175,7 +175,7 @@
       colorBlind:false, showHitbox:false, showFps:false, vibrate:true,
       keys:{up:'KeyW',down:'KeyS',left:'KeyA',right:'KeyD',fire:'MouseLeft',dash:'ShiftLeft',pause:'Escape'}
     },
-    unlockedWeapons:{ LASER:true, SHOTGUN:true, ROCKET:true, MINIGUN:true }
+    unlockedWeapons:{ LASER:true, SHOTGUN:true, ROCKET:true, MINIGUN:true, PLASMA:true, BOOMERANG:true }
   };
   let save = loadSave();
 
@@ -325,7 +325,9 @@
     {id:'LASER', name:'레이저', desc:'관통 지속빔, 과열 게이지', type:'ranged', move:1.00},
     {id:'SHOTGUN', name:'산탄', desc:'확산 다중탄, 근접 고효율', type:'ranged', move:1.00},
     {id:'ROCKET', name:'로켓', desc:'폭발 범위 피해/넉백', type:'ranged', move:0.95},
-    {id:'MINIGUN', name:'기관총', desc:'고연사 저반동, 과열', type:'ranged', move:1.05}
+    {id:'MINIGUN', name:'기관총', desc:'고연사 저반동, 과열', type:'ranged', move:1.05},
+    {id:'PLASMA', name:'플라즈마', desc:'충전식 고위력 관통탄', type:'ranged', move:0.90},
+    {id:'BOOMERANG', name:'부메랑', desc:'되돌아오는 곡선 투사체', type:'ranged', move:1.05}
   ];
   let chosenWeapon = 'LASER';
 
@@ -426,6 +428,9 @@
       this.weapon=chosenWeapon;
       this.aim=0;
       this.alive=true;
+      // 플라즈마 캐논용
+      this.chargeTime=0;
+      this.isCharging=false;
     }
     speed(){
       const w=weapons.find(w=>w.id===this.weapon);
@@ -1065,7 +1070,74 @@
   // ===== 무기 구현 =====
   function handleWeaponFire(p, dt, wantsFire){
     const bw = p.weapon;
-    // 원거리 공용: 사격
+    
+    // 플라즈마 캐논은 별도 처리 (fireCd 체크 우회)
+    if(bw==='PLASMA'){
+      if(wantsFire && !p.isCharging && p.fireCd <= 0) {
+        p.isCharging = true;
+        p.chargeTime = 0;
+      }
+      
+      if(p.isCharging) {
+        p.chargeTime += dt;
+        p.chargeTime = Math.min(2.0, p.chargeTime); // 최대 2초 충전
+        
+        // 충전 이펙트
+        const chargeIntensity = p.chargeTime / 2.0;
+        if(Math.random() < chargeIntensity * 0.8) {
+          spawnPart({
+            x: p.x + rand(-15, 15),
+            y: p.y + rand(-15, 15),
+            ttl: 0.2,
+            color: `hsl(${180 + chargeIntensity * 60}, 100%, ${50 + chargeIntensity * 30}%)`,
+            sz: rand(2, 4 + chargeIntensity * 3)
+          });
+        }
+      }
+      
+      if(!wantsFire && p.isCharging) {
+        // 발사!
+        const chargeRatio = p.chargeTime / 2.0;
+        const size = 6 + chargeRatio * 8; // 6~14
+        const damage = (2.0 + chargeRatio * 4.0) * playerUp.dmg; // 2.0~6.0배
+        const speed = 500 * playerUp.projSpeed;
+        const penetration = Math.floor(chargeRatio * 4); // 0~4 관통
+        
+        spawnBullet({
+          x: p.x + Math.cos(p.aim) * 20,
+          y: p.y + Math.sin(p.aim) * 20,
+          vx: Math.cos(p.aim) * speed,
+          vy: Math.sin(p.aim) * speed,
+          r: size,
+          dmg: damage,
+          color: `hsl(${180 + chargeRatio * 60}, 100%, ${60 + chargeRatio * 20}%)`,
+          hostile: false,
+          ttl: 2.5,
+          penetration: penetration,
+          plasma: true
+        });
+        
+        // 발사 이펙트
+        for(let i=0; i<15; i++) {
+          spawnPart({
+            x: p.x,
+            y: p.y,
+            vx: Math.cos(p.aim + rand(-0.4, 0.4)) * rand(50, 200),
+            vy: Math.sin(p.aim + rand(-0.4, 0.4)) * rand(50, 200),
+            ttl: rand(0.3, 0.8),
+            color: `hsl(${180 + chargeRatio * 60}, 100%, ${60 + chargeRatio * 20}%)`,
+            sz: rand(3, 6)
+          });
+        }
+        
+        p.isCharging = false;
+        p.chargeTime = 0;
+        p.fireCd = 0.4 / playerUp.rof;
+      }
+      return; // 플라즈마는 여기서 종료
+    }
+    
+    // 원거리 공용: 사격 (플라즈마 제외)
     if(wantsFire && p.fireCd<=0){
       if(bw==='LASER'){
         // 지속빔: 짧게 펄스 형태(성능상)
@@ -1105,6 +1177,41 @@
         const dmg = 10*playerUp.dmg;
         const range = 1*playerUp.range;
         spawnBullet({x:p.x,y:p.y,vx:Math.cos(a)*spd*1.1,vy:Math.sin(a)*spd*1.1,r:5,dmg:dmg*0.25,ttl:0.5*range,color:'#ffd24a',hostile:false}); // Damage nerfed from 0.4 to 0.25
+      }
+      else if(bw==='BOOMERANG'){
+        p.fireCd = 1.2 / playerUp.rof;
+        const speed = 400 * playerUp.projSpeed;
+        const damage = 1.2 * playerUp.dmg; // 데미지 너프: 2.0 -> 1.2
+        
+        spawnBullet({
+          x: p.x + Math.cos(p.aim) * 15,
+          y: p.y + Math.sin(p.aim) * 15,
+          vx: Math.cos(p.aim) * speed,
+          vy: Math.sin(p.aim) * speed,
+          r: 8,
+          dmg: damage,
+          color: '#00ff88',
+          hostile: false,
+          ttl: 4.0,
+          boomerang: true,
+          originX: p.x,
+          originY: p.y,
+          launched: now(),
+          spinAngle: 0
+        });
+        
+        // 부메랑 발사 이펙트
+        for(let i=0; i<8; i++) {
+          spawnPart({
+            x: p.x,
+            y: p.y,
+            vx: Math.cos(p.aim + i*TAU/8) * 80,
+            vy: Math.sin(p.aim + i*TAU/8) * 80,
+            ttl: 0.4,
+            color: '#00ff88',
+            sz: rand(3, 5)
+          });
+        }
       }
     }
   }
@@ -1174,6 +1281,41 @@
       if(b.ring){ // 충격파형
         b.r += b.vr*dt;
         b.ttl -= dt;
+      }else if(b.boomerang && !b.hostile){ // 부메랑
+        const elapsed = (now() - b.launched) / 1000;
+        b.spinAngle += dt * 15; // 회전 애니메이션
+        
+        if(elapsed < 1.5) {
+          // 나가는 단계
+          b.x += b.vx * dt;
+          b.y += b.vy * dt;
+        } else {
+          // 돌아오는 단계
+          const returnAngle = angleTo(b.x, b.y, b.originX, b.originY);
+          const returnSpeed = 300 + (elapsed - 1.5) * 200; // 점점 빨라짐
+          b.vx = Math.cos(returnAngle) * returnSpeed;
+          b.vy = Math.sin(returnAngle) * returnSpeed;
+          b.x += b.vx * dt;
+          b.y += b.vy * dt;
+          
+          // 플레이어에게 복귀했는지 체크
+          if(player && dist2(b.x, b.y, player.x, player.y) < 900) { // 30픽셀 반경
+            b.alive = false;
+            // 복귀 이펙트
+            for(let i=0; i<6; i++) {
+              spawnPart({
+                x: b.x,
+                y: b.y,
+                vx: rand(-80, 80),
+                vy: rand(-80, 80),
+                ttl: 0.3,
+                color: '#00ff88',
+                sz: rand(2, 4)
+              });
+            }
+          }
+        }
+        b.ttl -= dt;
       }else if(b.homing){
         const distToPlayer = Math.hypot(b.x - player.x, b.y - player.y);
         // 플레이어와 150픽셀 이내로 가까워지거나 이미 직진모드면 직진 모드 유지
@@ -1220,7 +1362,25 @@
         }else{
           if(dist2(boss.x,boss.y,b.x,b.y) <= (boss.r + b.r)*(boss.r + b.r)){
             boss.take(b.dmg||1);
-            b.alive=false;
+            
+            // 플라즈마는 관통, 부메랑은 통과
+            if(!b.plasma && !b.boomerang) {
+              b.alive=false;
+            } else if(b.plasma && b.penetration !== undefined) {
+              b.penetration--;
+              if(b.penetration < 0) b.alive = false;
+              // 플라즈마 관통 이펙트
+              for(let i=0; i<8; i++) {
+                spawnPart({
+                  x: b.x + rand(-10, 10),
+                  y: b.y + rand(-10, 10),
+                  ttl: rand(0.2, 0.4),
+                  color: b.color,
+                  sz: rand(3, 6)
+                });
+              }
+            }
+            
             if(b.explode){
               // 픽셀 스타일 폭발 이펙트
               for(let i=0;i<50;i++){
@@ -1277,17 +1437,33 @@
         if(!enemyBullet.alive || !enemyBullet.hostile || !enemyBullet.homing) continue;
         
         if(dist2(playerBullet.x, playerBullet.y, enemyBullet.x, enemyBullet.y) < (playerBullet.r + enemyBullet.r) * (playerBullet.r + enemyBullet.r)){
-          playerBullet.alive = false;
-          enemyBullet.alive = false;
-          // 파괴 이펙트
-          for(let k=0; k<5; k++){
-            spawnPart({
-              x: enemyBullet.x + rand(-5, 5),
-              y: enemyBullet.y + rand(-5, 5),
-              ttl: rand(0.2, 0.4),
-              color: enemyBullet.color,
-              sz: rand(3, 6)
-            });
+          // 부메랑은 유도탄을 파괴하지만 계속 진행
+          if(playerBullet.boomerang) {
+            enemyBullet.alive = false;
+            // 유도탄 파괴 이펙트만 생성
+            for(let k=0; k<5; k++){
+              spawnPart({
+                x: enemyBullet.x + rand(-5, 5),
+                y: enemyBullet.y + rand(-5, 5),
+                ttl: rand(0.2, 0.4),
+                color: enemyBullet.color,
+                sz: rand(3, 6)
+              });
+            }
+          } else {
+            // 일반 총알은 서로 파괴
+            playerBullet.alive = false;
+            enemyBullet.alive = false;
+            // 파괴 이펙트
+            for(let k=0; k<5; k++){
+              spawnPart({
+                x: enemyBullet.x + rand(-5, 5),
+                y: enemyBullet.y + rand(-5, 5),
+                ttl: rand(0.2, 0.4),
+                color: enemyBullet.color,
+                sz: rand(3, 6)
+              });
+            }
           }
           break;
         }
@@ -1370,6 +1546,29 @@
         ctx.shadowBlur = 8;
         ctx.shadowColor = b.color||'#49f3ff';
         ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,TAU); ctx.stroke();
+        ctx.restore();
+      }else if(b.boomerang){
+        // 부메랑 특별 렌더링
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.rotate(b.spinAngle || 0);
+        ctx.fillStyle = b.color;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = b.color;
+        // 부메랑 모양 (V자)
+        ctx.fillRect(-b.r, -2, b.r*2, 4);
+        ctx.fillRect(-2, -b.r, 4, b.r*2);
+        ctx.restore();
+      }else if(b.plasma){
+        // 플라즈마 특별 렌더링
+        ctx.save();
+        ctx.fillStyle = b.color;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = b.color;
+        ctx.fillRect(b.x - b.r, b.y - b.r, b.r*2, b.r*2);
+        // 내부 코어
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(b.x - b.r*0.4, b.y - b.r*0.4, b.r*0.8, b.r*0.8);
         ctx.restore();
       }else{
         drawPixelBullet(b.x, b.y, b.r, b.color||'#49f3ff', !b.hostile);
@@ -1613,20 +1812,60 @@
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(Math.floor(x - coreSize/2), Math.floor(y - coreSize/2), coreSize, coreSize);
     } else {
-      // 적 탄환 - 위험한 느낌
+      // 적 탄환 - 위험하고 다양한 모양
       ctx.fillStyle = color;
-      ctx.shadowBlur = 4;
+      ctx.shadowBlur = 8;
       ctx.shadowColor = color;
       
-      // 다이아몬드 모양
       const halfSize = pixelSize / 2;
-      ctx.beginPath();
-      ctx.moveTo(x, y - halfSize);
-      ctx.lineTo(x + halfSize, y);
-      ctx.lineTo(x, y + halfSize);
-      ctx.lineTo(x - halfSize, y);
-      ctx.closePath();
-      ctx.fill();
+      
+      // 색상에 따라 다른 모양
+      if(color.includes('#ff3b5c') || color.includes('#ff71ff')) {
+        // 빨강/마젠타 계열 - 스파이크 다이아몬드
+        ctx.beginPath();
+        ctx.moveTo(x, y - halfSize * 1.3);
+        ctx.lineTo(x + halfSize * 0.7, y - halfSize * 0.3);
+        ctx.lineTo(x + halfSize * 1.3, y);
+        ctx.lineTo(x + halfSize * 0.7, y + halfSize * 0.3);
+        ctx.lineTo(x, y + halfSize * 1.3);
+        ctx.lineTo(x - halfSize * 0.7, y + halfSize * 0.3);
+        ctx.lineTo(x - halfSize * 1.3, y);
+        ctx.lineTo(x - halfSize * 0.7, y - halfSize * 0.3);
+        ctx.closePath();
+        ctx.fill();
+      } else if(color.includes('#00e5ff') || color.includes('#49f3ff')) {
+        // 청록 계열 - 십자 모양
+        ctx.fillRect(x - halfSize * 1.2, y - halfSize * 0.4, halfSize * 2.4, halfSize * 0.8);
+        ctx.fillRect(x - halfSize * 0.4, y - halfSize * 1.2, halfSize * 0.8, halfSize * 2.4);
+      } else if(color.includes('#ffd24a')) {
+        // 노란색 - 별 모양
+        ctx.beginPath();
+        for(let i = 0; i < 8; i++) {
+          const angle = (i * Math.PI) / 4;
+          const radius = (i % 2 === 0) ? halfSize * 1.2 : halfSize * 0.6;
+          const px = x + Math.cos(angle) * radius;
+          const py = y + Math.sin(angle) * radius;
+          if(i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        // 기본 - 다이아몬드 모양
+        ctx.beginPath();
+        ctx.moveTo(x, y - halfSize);
+        ctx.lineTo(x + halfSize, y);
+        ctx.lineTo(x, y + halfSize);
+        ctx.lineTo(x - halfSize, y);
+        ctx.closePath();
+        ctx.fill();
+      }
+      
+      // 내부 어두운 코어 추가
+      ctx.globalAlpha = 0.6;
+      ctx.fillStyle = '#000000';
+      const coreSize = Math.max(1, pixelSize * 0.3);
+      ctx.fillRect(Math.floor(x - coreSize/2), Math.floor(y - coreSize/2), coreSize, coreSize);
     }
     
     ctx.restore();
