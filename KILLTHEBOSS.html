@@ -1165,7 +1165,7 @@
       }
       else if(bw==='ROCKET'){
         const a=p.aim, spd=300*playerUp.projSpeed; // Speed up
-        spawnBullet({x:p.x+Math.cos(a)*18,y:p.y+Math.sin(a)*18,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r:6,dmg:2.8*playerUp.dmg,color:'#ffd24a',hostile:false,ttl:2.4, explode:true}); // Damage up
+        spawnBullet({x:p.x+Math.cos(a)*18,y:p.y+Math.sin(a)*18,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r:6,dmg:3.5*playerUp.dmg,color:'#ffd24a',hostile:false,ttl:2.4, explode:true}); // Damage buffed from 2.8 to 3.5
         p.fireCd=0.65/ playerUp.rof; // Cooldown up
         // 픽셀 스타일 로켓 발사 이펙트
         for(let i=0;i<8;i++) spawnPart({x:p.x+Math.cos(p.aim+Math.PI)*15+rand(-2,2),y:p.y+Math.sin(p.aim+Math.PI)*15+rand(-2,2),ttl:0.2,color:'#ffd24a',sz:rand(3,6)});
