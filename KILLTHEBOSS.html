@@ -661,48 +661,54 @@
       if(S.modeTimer > 5) { S.mode = (S.mode + 1) % 3; S.modeTimer = 0; }
       
       if(S.cd<=0){
-        S.cd = 0.06 + S.mode * 0.02;
+        S.cd = 0.12 + S.mode * 0.03; // 발사 간격 증가 (0.06->0.12, 0.02->0.03)
         const speed=140 + S.mode * 20;
         const a=S.a;
         const col=settings.colorBlind? '#ffd24a' : '#ff71ff';
         
-        if(S.mode === 0) { // 2-way 스파이럴 - 강화
+        if(S.mode === 0) { // 2-way 스파이럴 - 간격 증가
           for(let arm=0; arm<2; arm++){
             const baseAngle = a + arm*TAU/2;
             spawnBullet({x:b.x,y:b.y, vx:Math.cos(baseAngle)*speed, vy:Math.sin(baseAngle)*speed, r:7, dmg:1, color:col, hostile:true});
-            // 추가 분기
+            // 추가 분기 - 개수 감소
             for(let sub=-1; sub<=1; sub+=2){
-              spawnBullet({x:b.x,y:b.y, vx:Math.cos(baseAngle+sub*0.2)*speed*0.8, vy:Math.sin(baseAngle+sub*0.2)*speed*0.8, r:5, dmg:1, color:'#00e5ff', hostile:true});
+              if(Math.random() < 0.6) { // 60% 확률로만 생성
+                spawnBullet({x:b.x,y:b.y, vx:Math.cos(baseAngle+sub*0.3)*speed*0.7, vy:Math.sin(baseAngle+sub*0.3)*speed*0.7, r:4, dmg:1, color:'#00e5ff', hostile:true});
+              }
             }
           }
-        } else if(S.mode === 1) { // 4-way 스파이럴 - 강화
+        } else if(S.mode === 1) { // 4-way 스파이럴 - 중간탄 제거
           for(let i=0;i<4;i++){
             const aa = a + i*TAU/4;
             spawnBullet({x:b.x,y:b.y, vx:Math.cos(aa)*speed, vy:Math.sin(aa)*speed, r:7, dmg:1, color:'#49f3ff', hostile:true});
-            // 중간 각도 추가
-            const midAngle = aa + TAU/8;
-            spawnBullet({x:b.x,y:b.y, vx:Math.cos(midAngle)*speed*0.6, vy:Math.sin(midAngle)*speed*0.6, r:5, dmg:1, color:'#ff3b5c', hostile:true});
+            // 중간 각도 추가 - 확률적 생성
+            if(Math.random() < 0.4) { // 40% 확률로만 생성
+              const midAngle = aa + TAU/8;
+              spawnBullet({x:b.x,y:b.y, vx:Math.cos(midAngle)*speed*0.5, vy:Math.sin(midAngle)*speed*0.5, r:4, dmg:1, color:'#ff3b5c', hostile:true});
+            }
           }
-        } else { // 6-way 가변속도 - 강화
+        } else { // 6-way 가변속도 - 반대방향 탄 감소
           for(let i=0;i<6;i++){
             const aa = a + i*TAU/6;
             const spd = speed + Math.sin(a + i)*40;
             spawnBullet({x:b.x,y:b.y, vx:Math.cos(aa)*spd, vy:Math.sin(aa)*spd, r:7, dmg:1, color:'#ffd24a', hostile:true});
           }
-          // 반대 방향 3-way
-          for(let i=0;i<3;i++){
-            const aa = -a + i*TAU/3;
-            spawnBullet({x:b.x,y:b.y, vx:Math.cos(aa)*speed*0.7, vy:Math.sin(aa)*speed*0.7, r:6, dmg:1, color:'#ff71ff', hostile:true});
+          // 반대 방향 3-way - 개수 감소
+          if(Math.random() < 0.5) { // 50% 확률로만 생성
+            for(let i=0;i<2;i++){ // 3개에서 2개로 감소
+              const aa = -a + i*TAU/2;
+              spawnBullet({x:b.x,y:b.y, vx:Math.cos(aa)*speed*0.6, vy:Math.sin(aa)*speed*0.6, r:5, dmg:1, color:'#ff71ff', hostile:true});
+            }
           }
         }
       }
       
-      // 추가: 바운싱 탄 - 강화
-      if(Math.floor(b.timer*3)%9===0 && chance(0.06)){
+      // 추가: 바운싱 탄 - 빈도 감소
+      if(Math.floor(b.timer*3)%12===0 && chance(0.03)){ // 주기 증가 (9->12), 확률 감소 (0.06->0.03)
         const base=angleTo(b.x,b.y, player.x,player.y);
-        for(let i=-3;i<=3;i++){
-          const aa=base+i*0.2;
-          spawnBullet({x:b.x,y:b.y, vx:Math.cos(aa)*200, vy:Math.sin(aa)*200, r:8, dmg:1, color:'#ff3b5c', hostile:true, bounce:4});
+        for(let i=-2;i<=2;i++){ // 범위 감소 (-3~3 -> -2~2)
+          const aa=base+i*0.3; // 각도 간격 증가 (0.2->0.3)
+          spawnBullet({x:b.x,y:b.y, vx:Math.cos(aa)*180, vy:Math.sin(aa)*180, r:7, dmg:1, color:'#ff3b5c', hostile:true, bounce:3}); // 속도 감소 (200->180), 바운스 감소 (4->3)
         }
       }
     },
@@ -712,42 +718,42 @@
       const L=b._lz; L.cd-=dt;
       
       if(L.cd<=0){
-        L.cd = 3.8 - L.step * 0.2; // 점점 빨라짐
+        L.cd = 5.0 - L.step * 0.15; // 레이저 간격 증가 (3.8->5.0, 0.2->0.15)
         L.step++;
         L.multiMode = L.step % 3; // 3가지 레이저 패턴
         
         if(L.multiMode === 0) { // 단일 추적 레이저
-          const target = angleTo(b.x,b.y, player.x,player.y) + rand(-0.4,0.4);
-          L.warm = 1.0; L.target = target;
+          const target = angleTo(b.x,b.y, player.x,player.y) + rand(-0.3,0.3); // 정확도 약간 감소
+          L.warm = 1.2; L.target = target; // 예고 시간 증가
           setTimeout(()=>{
             if(!boss || !boss.alive) return;
-            const len=1400, w=12;
-            for(let t=0;t<30;t++){
-              const d = (t/30)*len;
-              spawnBullet({x:b.x+Math.cos(target)*d, y:b.y+Math.sin(target)*d, vx:0,vy:0, r:w, dmg:2, color:'#ff3b5c', hostile:true, ttl:0.12, laser:true});
+            const len=1200, w=10; // 길이와 폭 감소 (1400->1200, 12->10)
+            for(let t=0;t<25;t++){ // 레이저 세그먼트 감소 (30->25)
+              const d = (t/25)*len;
+              spawnBullet({x:b.x+Math.cos(target)*d, y:b.y+Math.sin(target)*d, vx:0,vy:0, r:w, dmg:2, color:'#ff3b5c', hostile:true, ttl:0.1, laser:true}); // ttl 감소
             }
-          }, 1000);
-        } else if(L.multiMode === 1) { // 3-way 레이저
-          for(let i=-1;i<=1;i++){
-            const target = angleTo(b.x,b.y, player.x,player.y) + i*0.6;
-            L.warm = 1.2;
+          }, 1200);
+        } else if(L.multiMode === 1) { // 2-way 레이저 (3-way에서 감소)
+          for(let i=-0.5;i<=0.5;i+=1){ // 3개에서 2개로 감소
+            const target = angleTo(b.x,b.y, player.x,player.y) + i*0.8; // 각도 간격 증가
+            L.warm = 1.4; // 예고 시간 증가
             setTimeout(()=>{
               if(!boss || !boss.alive) return;
-              const len=1200, w=10;
-              for(let t=0;t<25;t++){
-                const d = (t/25)*len;
-                spawnBullet({x:b.x+Math.cos(target)*d, y:b.y+Math.sin(target)*d, vx:0,vy:0, r:w, dmg:1.5, color:'#ffd24a', hostile:true, ttl:0.1, laser:true});
+              const len=1000, w=8; // 길이와 폭 감소 (1200->1000, 10->8)
+              for(let t=0;t<20;t++){ // 세그먼트 감소 (25->20)
+                const d = (t/20)*len;
+                spawnBullet({x:b.x+Math.cos(target)*d, y:b.y+Math.sin(target)*d, vx:0,vy:0, r:w, dmg:1.5, color:'#ffd24a', hostile:true, ttl:0.08, laser:true});
               }
-            }, 1200);
+            }, 1400);
           }
-        } else { // 회전 레이저
+        } else { // 회전 레이저 - 회전 수 감소
           const baseAngle = angleTo(b.x,b.y, player.x,player.y);
-          L.warm = 1.5;
-          for(let rot=0; rot<5; rot++){
+          L.warm = 1.8; // 예고 시간 증가
+          for(let rot=0; rot<3; rot++){ // 5개에서 3개로 감소
             setTimeout(()=>{
               if(!boss || !boss.alive) return;
-              const target = baseAngle + rot*0.3;
-              const len=1300, w=8;
+              const target = baseAngle + rot*0.5; // 각도 간격 증가
+              const len=1100, w=6; // 길이와 폭 감소 (1300->1100, 8->6)
               for(let t=0;t<28;t++){
                 const d = (t/28)*len;
                 spawnBullet({x:b.x+Math.cos(target)*d, y:b.y+Math.sin(target)*d, vx:0,vy:0, r:w, dmg:1, color:'#49f3ff', hostile:true, ttl:0.08, laser:true});
@@ -1099,7 +1105,7 @@
         // 발사!
         const chargeRatio = p.chargeTime / 2.0;
         const size = 6 + chargeRatio * 8; // 6~14
-        const damage = (2.0 + chargeRatio * 4.0) * playerUp.dmg; // 2.0~6.0배
+        const damage = (2.5 + chargeRatio * 5.0) * playerUp.dmg; // 2.5~7.5배 (was 2.0~6.0)
         const speed = 500 * playerUp.projSpeed;
         const penetration = Math.floor(chargeRatio * 4); // 0~4 관통
         
@@ -1141,7 +1147,7 @@
     if(wantsFire && p.fireCd<=0){
       if(bw==='LASER'){
         // 지속빔: 짧게 펄스 형태(성능상)
-        const len=900, seg=22, dmg=0.6*playerUp.dmg; // Damage buffed
+        const len=900, seg=22, dmg=0.8*playerUp.dmg; // Damage buffed from 0.6 to 0.8
         for(let i=0;i<seg;i++){
           const d=i/seg*len;
           const px = p.x + Math.cos(p.aim)*d;
@@ -1165,7 +1171,7 @@
       }
       else if(bw==='ROCKET'){
         const a=p.aim, spd=300*playerUp.projSpeed; // Speed up
-        spawnBullet({x:p.x+Math.cos(a)*18,y:p.y+Math.sin(a)*18,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r:6,dmg:3.5*playerUp.dmg,color:'#ffd24a',hostile:false,ttl:2.4, explode:true}); // Damage buffed from 2.8 to 3.5
+        spawnBullet({x:p.x+Math.cos(a)*18,y:p.y+Math.sin(a)*18,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r:6,dmg:5.0*playerUp.dmg,color:'#ffd24a',hostile:false,ttl:2.4, explode:true}); // Damage buffed from 4.2 to 5.0
         p.fireCd=0.65/ playerUp.rof; // Cooldown up
         // 픽셀 스타일 로켓 발사 이펙트
         for(let i=0;i<8;i++) spawnPart({x:p.x+Math.cos(p.aim+Math.PI)*15+rand(-2,2),y:p.y+Math.sin(p.aim+Math.PI)*15+rand(-2,2),ttl:0.2,color:'#ffd24a',sz:rand(3,6)});
